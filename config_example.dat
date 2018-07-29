@@ -1,0 +1,23 @@
+############################# EXAMPLE ###########################
+# Directories
+data_dir = D:/group_archive/
+posts_dir = posts/
+post_image_dir = images/
+post_video_dir = video/
+post_audio_dir = audio/
+post_raw_json_dir = raw_json_posts/
+user_raw_json_dir = raw_json_users/
+photos_dir = photo_albums/
+videos_dir = videos/
+audios_dir = audios/
+discussions_dir = discussions/
+links_file = links.txt
+readme_file = README
+
+# SNS API
+vk_api_id = 1111111
+vk_client_secret = qwerty
+vk_redirect_uri = https://oauth.vk.com/blank.html
+vk_token = 113j123j12lk...
+vk_group_id = 222222
+vk_user_id = 333333333
