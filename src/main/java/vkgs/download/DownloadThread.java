@@ -9,8 +9,7 @@ import java.net.URL;
 
 public final class DownloadThread extends Thread {
     private final static Logger logger = Logger.getLogger("downloader");
-    private  final DownloadQueueEntry entry;
-    private int repeatCounter;
+    private final DownloadQueueEntry entry;
     private FinishListener finishListener;
 
     public DownloadThread(DownloadQueueEntry entry) {
@@ -34,35 +33,37 @@ public final class DownloadThread extends Thread {
         InputStream is = null;
         OutputStream os = null;
 
-        while (true) {
-            try {
-                URL url = new URI(entry.getSource()).toURL();
-                File dstFile = new File(entry.getDestination());
-                if(dstFile.exists()){
-                    logger.info("SKIPPED. " + entry.getDestination() + " is already exists. ");
-                    return true;
-                }
-
-                is = url.openStream();
-                os = new FileOutputStream(dstFile);
-                byte[] b = new byte[2048];
-                int length;
-
-                while ((length = is.read(b)) != -1) {
-                    os.write(b, 0, length);
-                }
+        try {
+            URL url = new URI(entry.getSource()).toURL();
+            File dstFile = new File(entry.getDestination());
+            if (dstFile.exists()) {
+                logger.warn("SKIPPED. " + entry.getDestination() + " is already exists. ");
                 return true;
-            } catch (Exception e) {
-                logger.error(e);
-                return false;
-            } finally {
-                try {
-                    if (is != null) is.close();
-                    if (os != null) os.close();
-                } catch (IOException e) {
-                    logger.error(e);
-                    return false;
+            }
+
+            is = url.openStream();
+            os = new FileOutputStream(dstFile);
+            byte[] b = new byte[512];
+            int length;
+
+            while ((length = is.read(b)) != -1) {
+                os.write(b, 0, length);
+            }
+            os.flush();
+            return true;
+        } catch (Exception e) {
+            logger.error(e);
+            return false;
+        } finally {
+            try {
+                if (is != null)
+                    is.close();
+                if (os != null) {
+                    os.flush();
+                    os.close();
                 }
+            } catch (IOException e) {
+                logger.error(e);
             }
         }
     }

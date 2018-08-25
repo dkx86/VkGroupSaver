@@ -75,6 +75,8 @@ public class Main {
             logger.info(Settings.it().getPostImageDir() + " -> OK.");
             Files.createDirectories(Paths.get(Settings.it().getPostVideoDir()));
             logger.info(Settings.it().getPostVideoDir() + " -> OK.");
+            Files.createDirectories(Paths.get(Settings.it().getPostDocDir()));
+            logger.info(Settings.it().getPostDocDir() + " -> OK.");
 
             logger.info("Checking if 'PHOTOS' directory exists...");
             Files.createDirectories(Paths.get(Settings.it().getPhotosDir()));

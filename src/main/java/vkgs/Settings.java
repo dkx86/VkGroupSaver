@@ -26,6 +26,7 @@ public final class Settings {
     private String posts_dir;
     private String post_image_dir;
     private String post_video_dir;
+    private String post_docs_dir;
     private String post_audio_dir;
     private String post_raw_json_dir;
     private String user_raw_json_dir;
@@ -103,6 +104,10 @@ public final class Settings {
 
     public String getPostVideoDir() {
         return getPostsDir() + post_video_dir;
+    }
+
+    public String getPostDocDir(){
+        return getPostsDir() +  post_docs_dir;
     }
 
     public String getPostAudioDir() {

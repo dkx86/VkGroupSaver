@@ -1,6 +1,5 @@
 package vkgs.data;
 
-import com.vk.api.sdk.objects.audio.AudioFull;
 import com.vk.api.sdk.objects.base.Link;
 import com.vk.api.sdk.objects.groups.GroupFull;
 import com.vk.api.sdk.objects.photos.Photo;
@@ -10,10 +9,11 @@ import com.vk.api.sdk.objects.video.VideoFiles;
 import com.vk.api.sdk.objects.wall.WallPostFull;
 import com.vk.api.sdk.objects.wall.WallpostAttachment;
 import com.vk.api.sdk.objects.wall.WallpostAttachmentType;
+import org.apache.log4j.Logger;
 import vkgs.Settings;
 import vkgs.download.DownloadQueueEntry;
+import vkgs.download.DownloadThread;
 import vkgs.sns.ExtendedInfo;
-import org.apache.log4j.Logger;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -24,6 +24,7 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 
 public final class DataProcessor {
@@ -31,6 +32,7 @@ public final class DataProcessor {
     private final Logger logger;
     private final Map<Integer, UserFull> id2userMap = new HashMap<>();
     private final GroupFull groupInfo;
+
     public DataProcessor(ExtendedInfo extendedInfo, GroupFull groupInfo, Logger logger) {
         this.postFullList = extendedInfo.getPostFullList();
         this.logger = logger;
@@ -59,7 +61,7 @@ public final class DataProcessor {
 
     private static String getVideoSource(Video video) {
         final VideoFiles files = video.getFiles();
-        if(files == null)
+        if (files == null)
             return null;
         if (files.getMp1080() != null)
             return files.getMp1080();
@@ -78,25 +80,28 @@ public final class DataProcessor {
 
     public void start() {
         final List<DownloadQueueEntry> downloadQueueEntryList = new ArrayList<>();
-        ExecutorService executorService = Executors.newFixedThreadPool(4);
+        ExecutorService executorService = Executors.newFixedThreadPool(2);
         for (WallPostFull post : postFullList) {
             Map<WallpostAttachmentType, AttachContainer> attachContainerMap = collectAttachments(post, downloadQueueEntryList);
             saveTextPost(post.getId(), id2userMap.get(post.getFromId()), post.getDate(), post.getText(), attachContainerMap);
         }
 
         logger.info("Star downloading attachments. Queue size is " + downloadQueueEntryList.size());
-        //downloadQueueEntryList.forEach(e -> executorService.execute(new DownloadThread(e)));
-//        executorService.shutdown();
-//        try {
-//            executorService.awaitTermination(Integer.MAX_VALUE, TimeUnit.SECONDS);
-//        } catch (InterruptedException e) {
-//            logger.error(e);
-//        }
+        downloadQueueEntryList.forEach(e -> {
+            logger.info("Thread for " + e.toString());
+            executorService.execute(new DownloadThread(e));
+        });
+        executorService.shutdown();
+        try {
+            executorService.awaitTermination(Integer.MAX_VALUE, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            logger.error(e);
+        }
     }
 
     private Map<WallpostAttachmentType, AttachContainer> collectAttachments(WallPostFull post, List<DownloadQueueEntry> downloadQueueEntryList) {
         final Map<WallpostAttachmentType, AttachContainer> result = new HashMap<>();
-        if(post.getAttachments() == null)
+        if (post.getAttachments() == null)
             return result;
         for (WallpostAttachment item : post.getAttachments()) {
             String filename = "";
@@ -105,21 +110,24 @@ public final class DataProcessor {
             final WallpostAttachmentType itemType = item.getType();
             switch (itemType) {
                 case AUDIO:
+                    /*
                     AudioFull audio = item.getAudio();
                     source = audio.getUrl();
                     filename = audio.getArtist() + " - " + audio.getTitle();
                     filepath = Settings.it().getPostAudioDir() + post.getId() + "_" + filename;
-                    break;
+                    */
+                    logger.debug("Audio from post #" + post.getId());
+                    continue; //TODO
                 case PHOTO:
                     final Photo photo = item.getPhoto();
                     source = getPhotoSource(photo);
-                    filename = "img_" + post.getId() + ".jpg";
+                    filename = "img_" + post.getId() + '_' + photo.getId() + ".jpg";
                     filepath = Settings.it().getPostImageDir() + filename;
                     break;
                 case PHOTOS_LIST:
                     final List<String> photosList = item.getPhotosList();
                     logger.debug("Photo list from post #" + post.getId());
-                    photosList.forEach(p -> logger.debug(p));
+                    photosList.forEach(logger::debug);
                     continue; //TODO
                 case ALBUM:
                     logger.debug("Photo album from post #" + post.getId());
@@ -128,7 +136,7 @@ public final class DataProcessor {
                     final Video video = item.getVideo();
                     source = getVideoSource(video);
                     filename = video.getTitle();
-                    if(source == null){
+                    if (source == null) {
                         filename += " [NO FILE - EXTERNAL VIDEO]";
                         break;
                     }
@@ -141,7 +149,10 @@ public final class DataProcessor {
                     break;
                 case DOC:
                     logger.debug("Doc from post #" + post.getId());
-                    continue; //TODO
+                    source = item.getDoc().getUrl();
+                    filename = item.getDoc().getTitle();
+                    filepath = Settings.it().getPostDocDir() + filename;
+                    break;
                 case GRAFFITI:
                     logger.debug("Graffiti from post #" + post.getId());
                     continue; //TODO
@@ -164,7 +175,7 @@ public final class DataProcessor {
         final Path fileName = Paths.get(Settings.it().getPostsDir() + "post_" + id + ".txt");
         StringBuilder data = new StringBuilder();
         data.append("ID: ").append(id).append('\n');
-        if(author != null)
+        if (author != null)
             data.append(author.getFirstName()).append(' ').append(author.getLastName()).append(" id:「").append(author.getId()).append("」");
         else
             data.append("Group: ").append(groupInfo.getName()).append(' ').append(" id:「").append(groupInfo.getId()).append("」[ https://vk.com/").append(groupInfo.getScreenName()).append(']');

@@ -17,4 +17,12 @@ public final class DownloadQueueEntry {
     public String getDestination() {
         return destination;
     }
+
+    @Override
+    public String toString() {
+        return "DownloadQueueEntry{" +
+                "source='" + source + '\'' +
+                ", destination='" + destination + '\'' +
+                '}';
+    }
 }
