@@ -9,6 +9,7 @@ import com.vk.api.sdk.objects.wall.WallPostFull;
 import org.apache.log4j.Logger;
 import vkgs.data.DataProcessor;
 import vkgs.sns.ExtendedInfo;
+import vkgs.sns.PhotoAlbum;
 import vkgs.sns.Vk;
 
 import java.io.FileWriter;
@@ -16,15 +17,16 @@ import java.io.IOException;
 import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.List;
 
 public class Main {
     private final static Logger logger = Logger.getLogger("group_saver");
-    private static String fromDate;
-    private static Boolean isDiff;
 
     public static void main(String[] args) throws ClientException, ApiException {
+        String fromDate;
         if (args.length > 0)
             fromDate = args[0];
+        boolean isDiff;
         if (args.length == 2)
             isDiff = Boolean.getBoolean(args[1]);
 
@@ -46,6 +48,10 @@ public class Main {
         }
         logger.info("Found " + postsInfo.getPostFullList().size() + " posts.");
 
+        logger.info("Getting group albums...");
+        final List<PhotoAlbum> photoAlbumList = api.getAlbums();
+        logger.info("Found " + photoAlbumList.size() + " albums.");
+
         logger.info("Saving raw profiles into json...");
         for (UserFull user : postsInfo.getProfiles()) {
             try (Writer writer = new FileWriter(Settings.it().getUserRawJsonDir() + "user_" + user.getId() + ".json")) {
@@ -57,7 +63,7 @@ public class Main {
         logger.info(String.format("Found %s profiles.", postsInfo.getProfiles().size()));
 
         logger.info("Start processing information");
-        new DataProcessor(postsInfo, groupInfo, logger).start();
+        new DataProcessor(postsInfo, groupInfo, photoAlbumList, logger).start();
 
         logger.info("Completed");
     }

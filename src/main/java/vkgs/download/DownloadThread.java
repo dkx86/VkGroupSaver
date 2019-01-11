@@ -52,7 +52,7 @@ public final class DownloadThread extends Thread {
             os.flush();
             return true;
         } catch (Exception e) {
-            logger.error(e);
+            logger.error(e + "Source: " + entry.getSource());
             return false;
         } finally {
             try {

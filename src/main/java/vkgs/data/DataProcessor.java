@@ -6,6 +6,7 @@ import com.vk.api.sdk.objects.photos.Photo;
 import com.vk.api.sdk.objects.users.UserFull;
 import com.vk.api.sdk.objects.video.Video;
 import com.vk.api.sdk.objects.video.VideoFiles;
+import com.vk.api.sdk.objects.wall.Graffiti;
 import com.vk.api.sdk.objects.wall.WallPostFull;
 import com.vk.api.sdk.objects.wall.WallpostAttachment;
 import com.vk.api.sdk.objects.wall.WallpostAttachmentType;
@@ -14,13 +15,15 @@ import vkgs.Settings;
 import vkgs.download.DownloadQueueEntry;
 import vkgs.download.DownloadThread;
 import vkgs.sns.ExtendedInfo;
+import vkgs.sns.PhotoAlbum;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -32,12 +35,14 @@ public final class DataProcessor {
     private final Logger logger;
     private final Map<Integer, UserFull> id2userMap = new HashMap<>();
     private final GroupFull groupInfo;
+    private final List<PhotoAlbum> photoAlbumList;
 
-    public DataProcessor(ExtendedInfo extendedInfo, GroupFull groupInfo, Logger logger) {
+    public DataProcessor(ExtendedInfo extendedInfo, GroupFull groupInfo, List<PhotoAlbum> photoAlbumList, Logger logger) {
         this.postFullList = extendedInfo.getPostFullList();
         this.logger = logger;
         extendedInfo.getProfiles().forEach(u -> id2userMap.put(u.getId(), u));
         this.groupInfo = groupInfo;
+        this.photoAlbumList = photoAlbumList;
     }
 
     private static String getPhotoSource(Photo photo) {
@@ -59,6 +64,13 @@ public final class DataProcessor {
         return photo.getPhoto75();
     }
 
+    private static String getGraffitiSource(Graffiti graffiti) {
+        if (graffiti.getPhoto586() != null)
+            return graffiti.getPhoto586();
+
+        return graffiti.getPhoto200();
+    }
+
     private static String getVideoSource(Video video) {
         final VideoFiles files = video.getFiles();
         if (files == null)
@@ -78,20 +90,66 @@ public final class DataProcessor {
         return files.getMp240();
     }
 
+    public static String getDateString(Integer time) {
+        final LocalDateTime dateTime = LocalDateTime.ofEpochSecond(time, 0, ZoneOffset.ofHours(3));
+        final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm:ss dd-MM-yyyy", Locale.ENGLISH);
+        return dateTime.format(formatter);
+    }
+
     public void start() {
+        final List<DownloadQueueEntry> downloadPostsQueueEntryList = getPostsDownloadQueue();
+        logger.info("Star downloading attachments. Queue size is " + downloadPostsQueueEntryList.size());
+        startHeavyDownloads(downloadPostsQueueEntryList);
+
+
+        logger.info("Star downloading photo albums. List size: " + photoAlbumList.size());
+        for (PhotoAlbum photoAlbum : photoAlbumList) {
+            logger.info("Star downloading album: " + photoAlbum.getTitle() + " Photos count: " + photoAlbum.getPhotos().size());
+            final List<DownloadQueueEntry> downloadQueueEntryList = getPhotoAlbumsDownloadQueue(photoAlbum.getTitle(), photoAlbum.getPhotos());
+            startHeavyDownloads(downloadQueueEntryList);
+            doWait();
+        }
+        logger.info("All downloads completed");
+    }
+
+    private List<DownloadQueueEntry> getPhotoAlbumsDownloadQueue(String albumTitle, List<Photo> photos) {
         final List<DownloadQueueEntry> downloadQueueEntryList = new ArrayList<>();
-        ExecutorService executorService = Executors.newFixedThreadPool(2);
+
+        for (Photo photo : photos) {
+            final String filename = "img_" + photo.getId() + ".jpg";
+            final String dirPath = Settings.it().getPhotosDir() + albumTitle + "/";
+            try {
+                Files.createDirectories(Paths.get(dirPath));
+            } catch (IOException e) {
+                logger.error("Cannot create dir '" + dirPath + "' for album '" + albumTitle + "'.", e);
+                return Collections.emptyList();
+            }
+
+            downloadQueueEntryList.add(new DownloadQueueEntry(getPhotoSource(photo), dirPath + filename));
+        }
+
+        return downloadQueueEntryList;
+    }
+
+
+    private List<DownloadQueueEntry> getPostsDownloadQueue() {
+        final List<DownloadQueueEntry> downloadQueueEntryList = new ArrayList<>();
         for (WallPostFull post : postFullList) {
             Map<WallpostAttachmentType, AttachContainer> attachContainerMap = collectAttachments(post, downloadQueueEntryList);
             saveTextPost(post.getId(), id2userMap.get(post.getFromId()), post.getDate(), post.getText(), attachContainerMap);
         }
+        return downloadQueueEntryList;
+    }
 
-        logger.info("Star downloading attachments. Queue size is " + downloadQueueEntryList.size());
+    private void startHeavyDownloads(List<DownloadQueueEntry> downloadQueueEntryList) {
+        ExecutorService executorService = Executors.newFixedThreadPool(3);
         downloadQueueEntryList.forEach(e -> {
-            logger.info("Thread for " + e.toString());
+            //logger.info("Thread for " + e.toString());
             executorService.execute(new DownloadThread(e));
         });
+
         executorService.shutdown();
+
         try {
             executorService.awaitTermination(Integer.MAX_VALUE, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
@@ -128,7 +186,7 @@ public final class DataProcessor {
                     final List<String> photosList = item.getPhotosList();
                     logger.debug("Photo list from post #" + post.getId());
                     photosList.forEach(logger::debug);
-                    continue; //TODO
+                    continue;
                 case ALBUM:
                     logger.debug("Photo album from post #" + post.getId());
                     continue; //TODO
@@ -155,7 +213,11 @@ public final class DataProcessor {
                     break;
                 case GRAFFITI:
                     logger.debug("Graffiti from post #" + post.getId());
-                    continue; //TODO
+                    final Graffiti graffiti = item.getGraffiti();
+                    source = getGraffitiSource(graffiti);
+                    filename = "graffiti_" + post.getId() + '_' + graffiti.getId() + ".png";
+                    filepath = Settings.it().getPostImageDir() + filename;
+                    break;
             }
             AttachContainer container = result.get(itemType);
             if (container == null) {
@@ -176,15 +238,15 @@ public final class DataProcessor {
         StringBuilder data = new StringBuilder();
         data.append("ID: ").append(id).append('\n');
         if (author != null)
-            data.append(author.getFirstName()).append(' ').append(author.getLastName()).append(" id:「").append(author.getId()).append("」");
+            data.append(author.getFirstName()).append(' ').append(author.getLastName()).append(" id:[").append(author.getId()).append("]");
         else
-            data.append("Group: ").append(groupInfo.getName()).append(' ').append(" id:「").append(groupInfo.getId()).append("」[ https://vk.com/").append(groupInfo.getScreenName()).append(']');
+            data.append("Group: ").append(groupInfo.getName()).append(' ').append(" id:[").append(groupInfo.getId()).append("] ( https://vk.com/").append(groupInfo.getScreenName()).append(')');
         data.append(" @ ").append(getDateString(date));
-        data.append("-------------------------------------------------------------------------------\n");
+        data.append("--------------------------------\n");
         data.append(text).append('\n');
 
         attachContainerMap.forEach((type, container) -> {
-            data.append(container.getType().toString().toUpperCase()).append(" -----------------------------------------------------------------------\n");
+            data.append(container.getType().toString().toUpperCase()).append(" --------------------------------\n");
             container.getEntries().forEach(e -> data.append(e).append('\n'));
         });
 
@@ -197,10 +259,12 @@ public final class DataProcessor {
         logger.info("Post #" + id + " was saved to the file " + fileName.toAbsolutePath());
     }
 
-    private String getDateString(Integer timestamp) {
-        Date date = new Date(timestamp);
-        DateFormat f = new SimpleDateFormat("HH:mm:ss dd-MM-yyyy");
-        return f.format(date);
+    private void doWait() {
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            logger.error(e);
+        }
     }
 
 }
