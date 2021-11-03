@@ -1,16 +1,18 @@
 package vkgs.download;
 
 
+import java.net.URI;
+
 public final class DownloadQueueEntry {
-    private String source;
+    private URI source;
     private String destination;
 
-    public DownloadQueueEntry(String source, String destination) {
+    public DownloadQueueEntry(URI source, String destination) {
         this.source = source;
         this.destination = destination;
     }
 
-    public String getSource() {
+    public URI getSource() {
         return source;
     }
 

@@ -10,7 +10,6 @@ public final class ConfigTests {
         Settings settings = Settings.it();
         Assert.assertNotNull(settings);
         Assert.assertEquals("D:/group_archive/", settings.getDataDir());
-        Assert.assertEquals("D:/group_archive/posts/video/", settings.getPostVideoDir());
         Assert.assertEquals("D:/group_archive/README", settings.getReadmeFile());
     }
 }

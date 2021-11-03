@@ -10,8 +10,6 @@ post_raw_json_dir = raw_json_posts/
 user_raw_json_dir = raw_json_users/
 photos_dir = photo_albums/
 videos_dir = videos/
-audios_dir = audios/
-discussions_dir = discussions/
 links_file = links.txt
 readme_file = README
 

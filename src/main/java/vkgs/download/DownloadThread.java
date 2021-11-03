@@ -3,7 +3,6 @@ package vkgs.download;
 import org.apache.log4j.Logger;
 
 import java.io.*;
-import java.net.URI;
 import java.net.URL;
 
 
@@ -24,7 +23,7 @@ public final class DownloadThread extends Thread {
     public void run() {
         final boolean result = downloadFile();
         if (finishListener != null) {
-            finishListener.onFinish(result, entry.getSource(), entry.getDestination());
+            finishListener.onFinish(result, entry.getSource().toString(), entry.getDestination());
         }
     }
 
@@ -34,7 +33,7 @@ public final class DownloadThread extends Thread {
         OutputStream os = null;
 
         try {
-            URL url = new URI(entry.getSource()).toURL();
+            URL url = entry.getSource().toURL();
             File dstFile = new File(entry.getDestination());
             if (dstFile.exists()) {
                 logger.warn("SKIPPED. " + entry.getDestination() + " is already exists. ");

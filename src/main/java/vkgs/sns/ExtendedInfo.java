@@ -1,14 +1,14 @@
 package vkgs.sns;
 
 import com.vk.api.sdk.objects.users.UserFull;
-import com.vk.api.sdk.objects.wall.WallPostFull;
+import com.vk.api.sdk.objects.wall.WallpostFull;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class ExtendedInfo {
 
-    private final List<WallPostFull> postFullList;
+    private final List<WallpostFull> postFullList;
     private final List<UserFull> profiles;
 
     public ExtendedInfo() {
@@ -16,7 +16,7 @@ public class ExtendedInfo {
         this.profiles = new ArrayList<>();
     }
 
-    public List<WallPostFull> getPostFullList() {
+    public List<WallpostFull> getPostFullList() {
         return postFullList;
     }
 
@@ -24,7 +24,7 @@ public class ExtendedInfo {
         return profiles;
     }
 
-    public void addPosts(List<WallPostFull> items){
+    public void addPosts(List<WallpostFull> items){
         postFullList.addAll(items);
     }
 

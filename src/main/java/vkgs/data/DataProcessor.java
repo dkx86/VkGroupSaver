@@ -1,23 +1,23 @@
 package vkgs.data;
 
+import com.vk.api.sdk.objects.audio.Audio;
 import com.vk.api.sdk.objects.base.Link;
-import com.vk.api.sdk.objects.groups.GroupFull;
+import com.vk.api.sdk.objects.groups.responses.GetByIdObjectLegacyResponse;
 import com.vk.api.sdk.objects.photos.Photo;
+import com.vk.api.sdk.objects.photos.PhotoSizes;
 import com.vk.api.sdk.objects.users.UserFull;
 import com.vk.api.sdk.objects.video.Video;
-import com.vk.api.sdk.objects.video.VideoFiles;
-import com.vk.api.sdk.objects.wall.Graffiti;
-import com.vk.api.sdk.objects.wall.WallPostFull;
-import com.vk.api.sdk.objects.wall.WallpostAttachment;
-import com.vk.api.sdk.objects.wall.WallpostAttachmentType;
+import com.vk.api.sdk.objects.video.VideoFull;
+import com.vk.api.sdk.objects.wall.*;
 import org.apache.log4j.Logger;
 import vkgs.Settings;
 import vkgs.download.DownloadQueueEntry;
 import vkgs.download.DownloadThread;
 import vkgs.sns.ExtendedInfo;
-import vkgs.sns.PhotoAlbum;
+import vkgs.sns.MediaAlbum;
 
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -31,63 +31,46 @@ import java.util.concurrent.TimeUnit;
 
 
 public final class DataProcessor {
-    private final List<WallPostFull> postFullList;
+    private final List<WallpostFull> postFullList;
     private final Logger logger;
     private final Map<Integer, UserFull> id2userMap = new HashMap<>();
-    private final GroupFull groupInfo;
-    private final List<PhotoAlbum> photoAlbumList;
+    private final GetByIdObjectLegacyResponse groupInfo;
+    private final List<MediaAlbum<Photo>> photoAlbumList;
+    private final List<VideoFull> videoAddedList;
+    private final List<MediaAlbum<VideoFull>> videoAlbums;
 
-    public DataProcessor(ExtendedInfo extendedInfo, GroupFull groupInfo, List<PhotoAlbum> photoAlbumList, Logger logger) {
+    public DataProcessor(ExtendedInfo extendedInfo,
+                         GetByIdObjectLegacyResponse groupInfo,
+                         List<MediaAlbum<Photo>> photoAlbumList,
+                         List<VideoFull> videoAddedList,
+                         List<MediaAlbum<VideoFull>> videoAlbums,
+                         Logger logger) {
         this.postFullList = extendedInfo.getPostFullList();
         this.logger = logger;
         extendedInfo.getProfiles().forEach(u -> id2userMap.put(u.getId(), u));
         this.groupInfo = groupInfo;
         this.photoAlbumList = photoAlbumList;
+        this.videoAddedList = videoAddedList;
+        this.videoAlbums = videoAlbums;
     }
 
-    private static String getPhotoSource(Photo photo) {
-        if (photo.getPhoto2560() != null)
-            return photo.getPhoto2560();
+    private static URI getPhotoSource(Photo photo) {
+        if(photo.getSizes() == null)
+            return null;
+        PhotoSizes sizeHQ = photo.getSizes().get(0);
+        for (PhotoSizes size : photo.getSizes()) {
+            if(size.getWidth() > sizeHQ.getWidth())
+                sizeHQ = size;
+        }
 
-        if (photo.getPhoto1280() != null)
-            return photo.getPhoto1280();
-
-        if (photo.getPhoto807() != null)
-            return photo.getPhoto807();
-
-        if (photo.getPhoto604() != null)
-            return photo.getPhoto604();
-
-        if (photo.getPhoto130() != null)
-            return photo.getPhoto130();
-
-        return photo.getPhoto75();
+        return sizeHQ.getUrl();
     }
 
-    private static String getGraffitiSource(Graffiti graffiti) {
+    private static URI getGraffitiSource(Graffiti graffiti) {
         if (graffiti.getPhoto586() != null)
             return graffiti.getPhoto586();
 
         return graffiti.getPhoto200();
-    }
-
-    private static String getVideoSource(Video video) {
-        final VideoFiles files = video.getFiles();
-        if (files == null)
-            return null;
-        if (files.getMp1080() != null)
-            return files.getMp1080();
-
-        if (files.getMp720() != null)
-            return files.getMp720();
-
-        if (files.getMp480() != null)
-            return files.getMp480();
-
-        if (files.getMp360() != null)
-            return files.getMp360();
-
-        return files.getMp240();
     }
 
     public static String getDateString(Integer time) {
@@ -103,14 +86,21 @@ public final class DataProcessor {
 
 
         logger.info("Star downloading photo albums. List size: " + photoAlbumList.size());
-        for (PhotoAlbum photoAlbum : photoAlbumList) {
-            logger.info("Star downloading album: " + photoAlbum.getTitle() + " Photos count: " + photoAlbum.getPhotos().size());
-            final List<DownloadQueueEntry> downloadQueueEntryList = getPhotoAlbumsDownloadQueue(photoAlbum.getTitle(), photoAlbum.getPhotos());
+        for (MediaAlbum<Photo> photoAlbum : photoAlbumList) {
+            logger.info("Star downloading album: " + photoAlbum.getTitle() + " Photos count: " + photoAlbum.getItems().size());
+            final List<DownloadQueueEntry> downloadQueueEntryList = getPhotoAlbumsDownloadQueue(photoAlbum.getTitle(), photoAlbum.getItems());
             startHeavyDownloads(downloadQueueEntryList);
             doWait();
         }
+
+        logger.info("Star saving video links. List size: " + videoAddedList.size());
+        saveVideoLinks(videoAddedList, "added");
+        videoAlbums.forEach(a->saveVideoLinks(a.getItems(), a.getTitle().replace(" ", "_")));
+        doWait();
+
         logger.info("All downloads completed");
     }
+
 
     private List<DownloadQueueEntry> getPhotoAlbumsDownloadQueue(String albumTitle, List<Photo> photos) {
         final List<DownloadQueueEntry> downloadQueueEntryList = new ArrayList<>();
@@ -131,12 +121,11 @@ public final class DataProcessor {
         return downloadQueueEntryList;
     }
 
-
     private List<DownloadQueueEntry> getPostsDownloadQueue() {
         final List<DownloadQueueEntry> downloadQueueEntryList = new ArrayList<>();
-        for (WallPostFull post : postFullList) {
+        for (WallpostFull post : postFullList) {
             Map<WallpostAttachmentType, AttachContainer> attachContainerMap = collectAttachments(post, downloadQueueEntryList);
-            saveTextPost(post.getId(), id2userMap.get(post.getFromId()), post.getDate(), post.getText(), attachContainerMap);
+            saveTextPost(post, id2userMap.get(post.getFromId()), attachContainerMap);
         }
         return downloadQueueEntryList;
     }
@@ -157,25 +146,22 @@ public final class DataProcessor {
         }
     }
 
-    private Map<WallpostAttachmentType, AttachContainer> collectAttachments(WallPostFull post, List<DownloadQueueEntry> downloadQueueEntryList) {
+    private Map<WallpostAttachmentType, AttachContainer> collectAttachments(WallpostFull post, List<DownloadQueueEntry> downloadQueueEntryList) {
         final Map<WallpostAttachmentType, AttachContainer> result = new HashMap<>();
         if (post.getAttachments() == null)
             return result;
         for (WallpostAttachment item : post.getAttachments()) {
             String filename = "";
             String filepath = "";
-            String source = "";
+            URI source = null;
             final WallpostAttachmentType itemType = item.getType();
             switch (itemType) {
                 case AUDIO:
-                    /*
-                    AudioFull audio = item.getAudio();
+                    Audio audio = item.getAudio();
                     source = audio.getUrl();
                     filename = audio.getArtist() + " - " + audio.getTitle();
-                    filepath = Settings.it().getPostAudioDir() + post.getId() + "_" + filename;
-                    */
                     logger.debug("Audio from post #" + post.getId());
-                    continue; //TODO
+                    break;
                 case PHOTO:
                     final Photo photo = item.getPhoto();
                     source = getPhotoSource(photo);
@@ -192,14 +178,7 @@ public final class DataProcessor {
                     continue; //TODO
                 case VIDEO:
                     final Video video = item.getVideo();
-                    source = getVideoSource(video);
-                    filename = video.getTitle();
-                    if (source == null) {
-                        filename += " [NO FILE - EXTERNAL VIDEO]";
-                        break;
-                    }
-                    filename += ".mp4";
-                    filepath = Settings.it().getPostVideoDir() + filename;
+                    filename = video.getTitle() + " URL: " + video.getPlayer();
                     break;
                 case LINK:
                     Link link = item.getLink();
@@ -226,27 +205,31 @@ public final class DataProcessor {
             }
             container.addEntry(filename);
 
-            if (itemType != WallpostAttachmentType.LINK && source != null)
+            if (itemType != WallpostAttachmentType.LINK && itemType != WallpostAttachmentType.VIDEO && itemType != WallpostAttachmentType.AUDIO && source != null)
                 downloadQueueEntryList.add(new DownloadQueueEntry(source, filepath));
         }
 
         return result;
     }
 
-    private void saveTextPost(Integer id, UserFull author, Integer date, String text, Map<WallpostAttachmentType, AttachContainer> attachContainerMap) {
-        final Path fileName = Paths.get(Settings.it().getPostsDir() + "post_" + id + ".txt");
+    private void saveTextPost(WallpostFull post, UserFull author, Map<WallpostAttachmentType, AttachContainer> attachContainerMap) {
+        final Path fileName = Paths.get(Settings.it().getPostsDir() + "post_" + post.getId() + ".txt");
         StringBuilder data = new StringBuilder();
-        data.append("ID: ").append(id).append('\n');
+        data.append("ID: ").append(post.getId()).append("\n\n");
         if (author != null)
             data.append(author.getFirstName()).append(' ').append(author.getLastName()).append(" id:[").append(author.getId()).append("]");
         else
             data.append("Group: ").append(groupInfo.getName()).append(' ').append(" id:[").append(groupInfo.getId()).append("] ( https://vk.com/").append(groupInfo.getScreenName()).append(')');
-        data.append(" @ ").append(getDateString(date));
-        data.append("--------------------------------\n");
-        data.append(text).append('\n');
+        data.append(" @ ").append(getDateString(post.getDate())).append("\n\n");
+        data.append("----------------------------------------------------------------\n\n");
+        data.append(post.getText()).append("\n\n");
+        final PostCopyright postCopyright = post.getCopyright();
+        if(postCopyright != null) {
+            data.append("Copyright: ").append(postCopyright.getLink()).append("\n\n");
+        }
 
         attachContainerMap.forEach((type, container) -> {
-            data.append(container.getType().toString().toUpperCase()).append(" --------------------------------\n");
+            data.append(container.getType().toString().toUpperCase()).append(":\n");
             container.getEntries().forEach(e -> data.append(e).append('\n'));
         });
 
@@ -256,8 +239,36 @@ public final class DataProcessor {
             logger.error("Cannot save file: " + fileName);
             logger.error(e);
         }
-        logger.info("Post #" + id + " was saved to the file " + fileName.toAbsolutePath());
+        logger.info("Post #" + post.getId() + " was saved to the file " + fileName.toAbsolutePath());
     }
+
+    private void saveVideoLinks(List<VideoFull> videoList, String prefix) {
+        final Path fileName = Paths.get(Settings.it().getVideosDir() + prefix + "_video_links.txt");
+        final Path fileNameRaw = Paths.get(Settings.it().getVideosDir() + prefix+ "_video_links_raw.txt");
+
+        StringBuilder data = new StringBuilder();
+        StringBuilder dataRaw = new StringBuilder();
+
+        // сохраняем добавленные видео
+        for (VideoFull video : videoList) {
+            data.append("ID: ").append(video.getId());
+            data.append(" TITLE: ").append(video.getTitle());
+            data.append(" DESC: ").append(video.getDescription());
+            data.append(" URL: ").append(video.getPlayer());
+            data.append("\n");
+
+            dataRaw.append(video.getPlayer()).append("\n");
+        }
+
+        try {
+            Files.write(fileName, data.toString().getBytes());
+            Files.write(fileNameRaw, dataRaw.toString().getBytes());
+        } catch (IOException e) {
+            logger.error(e);
+        }
+    }
+
+
 
     private void doWait() {
         try {

@@ -25,14 +25,11 @@ public final class Settings {
     private String data_dir;
     private String posts_dir;
     private String post_image_dir;
-    private String post_video_dir;
     private String post_docs_dir;
-    private String post_audio_dir;
     private String post_raw_json_dir;
     private String user_raw_json_dir;
     private String photos_dir;
     private String videos_dir;
-    private String audios_dir;
     private String discussions_dir;
     private String links_file;
     private String readme_file;
@@ -102,16 +99,8 @@ public final class Settings {
         return getPostsDir() + post_image_dir;
     }
 
-    public String getPostVideoDir() {
-        return getPostsDir() + post_video_dir;
-    }
-
     public String getPostDocDir(){
         return getPostsDir() +  post_docs_dir;
-    }
-
-    public String getPostAudioDir() {
-        return getPostsDir() + post_audio_dir;
     }
 
     public String getPostRawJsonDir() {
@@ -128,14 +117,6 @@ public final class Settings {
 
     public String getVideosDir() {
         return getDataDir() + videos_dir;
-    }
-
-    public String getAudiosDir() {
-        return getDataDir() + audios_dir;
-    }
-
-    public String getDiscussionsDir() {
-        return getDataDir() + discussions_dir;
     }
 
     public String getLinksFile() {

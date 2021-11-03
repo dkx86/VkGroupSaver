@@ -1,18 +1,16 @@
 package vkgs.sns;
 
-import com.vk.api.sdk.objects.photos.Photo;
-
 import java.util.List;
 
-public final class PhotoAlbum {
+public final class MediaAlbum<T> {
     private final String title;
     private final String description;
-    private final List<Photo> photos;
+    private final List<T> items;
 
-    PhotoAlbum(String title, String description, List<Photo> photos) {
+    MediaAlbum(String title, String description, List<T> items) {
         this.title = title;
         this.description = description;
-        this.photos = photos;
+        this.items = items;
     }
 
     public String getTitle() {
@@ -23,7 +21,7 @@ public final class PhotoAlbum {
         return description;
     }
 
-    public List<Photo> getPhotos() {
-        return photos;
+    public List<T> getItems() {
+        return items;
     }
 }
