@@ -1,13 +1,14 @@
 package vkgs.download;
 
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.*;
 import java.net.URL;
 
 
 public final class DownloadThread extends Thread {
-    private final static Logger logger = Logger.getLogger("downloader");
+    private final static Logger logger = LogManager.getLogger("downloader");
     private final DownloadQueueEntry entry;
     private FinishListener finishListener;
 

@@ -1,0 +1,40 @@
+plugins {
+    id 'java'
+}
+
+group 'vkgs'
+version '0.2'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.1'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.1'
+
+    implementation 'com.vk.api:sdk:1.0.11'
+    implementation 'com.google.code.gson:gson:2.8.9'
+
+    //Binding for Log4J -->
+    implementation 'org.apache.logging.log4j:log4j-slf4j-impl:2.14.1'
+
+    //Log4j API and Core implementation required for binding
+    implementation 'org.apache.logging.log4j:log4j-api:2.14.1'
+    implementation 'org.apache.logging.log4j:log4j-core:2.14.1'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+jar {
+    duplicatesStrategy = 'include'
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+    manifest {
+        attributes "Main-Class": "vkgs.Main"
+    }
+}
+

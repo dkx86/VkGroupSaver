@@ -8,7 +8,8 @@ import com.vk.api.sdk.objects.photos.Photo;
 import com.vk.api.sdk.objects.users.UserFull;
 import com.vk.api.sdk.objects.video.VideoFull;
 import com.vk.api.sdk.objects.wall.WallpostFull;
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import vkgs.data.DataProcessor;
 import vkgs.sns.ExtendedInfo;
 import vkgs.sns.MediaAlbum;
@@ -22,7 +23,7 @@ import java.nio.file.Paths;
 import java.util.List;
 
 public class Main {
-    private final static Logger logger = Logger.getLogger("group_saver");
+    private final static Logger logger = LogManager.getLogger("group_saver");
 
     public static void main(String[] args) throws ClientException, ApiException {
 

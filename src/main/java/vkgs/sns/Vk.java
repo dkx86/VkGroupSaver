@@ -20,7 +20,7 @@ import com.vk.api.sdk.queries.video.VideoGetAlbumsQuery;
 import com.vk.api.sdk.queries.video.VideoGetQuery;
 import com.vk.api.sdk.queries.wall.WallGetQueryWithExtended;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.Logger;
 import vkgs.Settings;
 
 import java.util.ArrayList;
@@ -150,7 +150,7 @@ public class Vk {
         try {
             Thread.sleep(1500);
         } catch (InterruptedException e) {
-            logger.error(e);
+            logger.error("doWait failed", e);
         }
     }
 

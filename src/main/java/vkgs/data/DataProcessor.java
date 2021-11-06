@@ -9,7 +9,7 @@ import com.vk.api.sdk.objects.users.UserFull;
 import com.vk.api.sdk.objects.video.Video;
 import com.vk.api.sdk.objects.video.VideoFull;
 import com.vk.api.sdk.objects.wall.*;
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.Logger;
 import vkgs.Settings;
 import vkgs.download.DownloadQueueEntry;
 import vkgs.download.DownloadThread;
@@ -142,7 +142,7 @@ public final class DataProcessor {
         try {
             executorService.awaitTermination(Integer.MAX_VALUE, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
-            logger.error(e);
+            logger.error(e.getMessage(), e);
         }
     }
 
@@ -156,47 +156,49 @@ public final class DataProcessor {
             URI source = null;
             final WallpostAttachmentType itemType = item.getType();
             switch (itemType) {
-                case AUDIO:
+                case AUDIO -> {
                     Audio audio = item.getAudio();
                     source = audio.getUrl();
                     filename = audio.getArtist() + " - " + audio.getTitle();
                     logger.debug("Audio from post #" + post.getId());
-                    break;
-                case PHOTO:
+                }
+                case PHOTO -> {
                     final Photo photo = item.getPhoto();
                     source = getPhotoSource(photo);
                     filename = "img_" + post.getId() + '_' + photo.getId() + ".jpg";
                     filepath = Settings.it().getPostImageDir() + filename;
-                    break;
-                case PHOTOS_LIST:
+                }
+                case PHOTOS_LIST -> {
                     final List<String> photosList = item.getPhotosList();
                     logger.debug("Photo list from post #" + post.getId());
                     photosList.forEach(logger::debug);
                     continue;
-                case ALBUM:
+                }
+                case ALBUM -> {
                     logger.debug("Photo album from post #" + post.getId());
                     continue; //TODO
-                case VIDEO:
+                }
+                case VIDEO -> {
                     final Video video = item.getVideo();
                     filename = video.getTitle() + " URL: " + video.getPlayer();
-                    break;
-                case LINK:
+                }
+                case LINK -> {
                     Link link = item.getLink();
                     filename = link.getUrl() + " 「" + link.getCaption() + ": " + link.getDescription() + "」";
-                    break;
-                case DOC:
+                }
+                case DOC -> {
                     logger.debug("Doc from post #" + post.getId());
                     source = item.getDoc().getUrl();
                     filename = item.getDoc().getTitle();
                     filepath = Settings.it().getPostDocDir() + filename;
-                    break;
-                case GRAFFITI:
+                }
+                case GRAFFITI -> {
                     logger.debug("Graffiti from post #" + post.getId());
                     final Graffiti graffiti = item.getGraffiti();
                     source = getGraffitiSource(graffiti);
                     filename = "graffiti_" + post.getId() + '_' + graffiti.getId() + ".png";
                     filepath = Settings.it().getPostImageDir() + filename;
-                    break;
+                }
             }
             AttachContainer container = result.get(itemType);
             if (container == null) {
@@ -237,7 +239,7 @@ public final class DataProcessor {
             Files.write(fileName, data.toString().getBytes());
         } catch (IOException e) {
             logger.error("Cannot save file: " + fileName);
-            logger.error(e);
+            logger.error(e.getMessage(), e);
         }
         logger.info("Post #" + post.getId() + " was saved to the file " + fileName.toAbsolutePath());
     }
@@ -264,7 +266,7 @@ public final class DataProcessor {
             Files.write(fileName, data.toString().getBytes());
             Files.write(fileNameRaw, dataRaw.toString().getBytes());
         } catch (IOException e) {
-            logger.error(e);
+            logger.error(e.getMessage(), e);
         }
     }
 
@@ -274,7 +276,7 @@ public final class DataProcessor {
         try {
             Thread.sleep(1000);
         } catch (InterruptedException e) {
-            logger.error(e);
+            logger.error("doWait failed", e);
         }
     }
 

@@ -25,3 +25,9 @@ hs_err_pid*
 config.dat
 /target
 /.idea
+
+.gradle
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**
+!**/src/test/**

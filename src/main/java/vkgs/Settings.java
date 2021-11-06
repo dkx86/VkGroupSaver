@@ -1,6 +1,7 @@
 package vkgs;
 
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -12,7 +13,7 @@ import java.util.List;
 public final class Settings {
 
     private static final String FILE_NAME = "config.dat";
-    private final static Logger logger = Logger.getLogger("group_saver");
+    private final static Logger logger = LogManager.getLogger("group_saver");
     private static Settings instance;
 
     private Integer vk_api_id;
